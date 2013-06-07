@@ -1,0 +1,148 @@
+<?php
+
+function islandora_access_test_modules() {
+  return array(
+    'islandora',
+    'islandora_basic_collection',
+  );
+}
+
+function islandora_access_test_islandora_object_access($op) {
+  // Use permission restrictions from $_SESSION to deny thingsu.
+  foreach (islandora_access_test_modules() as $module) {
+    if (array_key_exists($op, module_invoke($module, 'permission'))) {
+      if (isset($_SESSION['islandora_access_test_perms'])) {
+        $allowed = array_filter($_SESSION['islandora_access_test_perms']);
+        return array_key_exists($op, $allowed);
+      }
+    }
+  }
+  return NULL;
+}
+
+function islandora_access_test_islandora_datastream_access($op, $datastream) {
+  if (FEDORA_VIEW_OBJECTS == $op && isset($_SESSION['islandora_access_test_datastream_pid']) && $_SESSION['islandora_access_test_datastream_pid'] == $datastream->parent->id) {
+    if (isset($_SESSION['islandora_access_test_datastream_view'])) {
+      $allowed = array_filter($_SESSION['islandora_access_test_datastream_view']);
+      return array_key_exists($datastream->id, $allowed);
+    }
+  }
+  return NULL;
+}
+
+function islandora_access_test_block_info(){
+  $delta = array(
+    'islandora_access_test' => array(
+      'info' => t('Islandora Access Test Block'),
+      'visibility' => BLOCK_VISIBILITY_LISTED,
+      'pages' => implode("\n", array(
+        'islandora/object/*',
+      )),
+    ),
+  );
+
+  return $delta;
+}
+
+function islandora_access_test_block_view($delta = '') {
+  if ($delta == 'islandora_access_test') {
+    return array(
+      'subject' => t('Islandora Access Test'),
+      'content' => drupal_get_form('islandora_access_test_form'),
+    );
+  }
+}
+
+function islandora_access_test_form($form, &$form_state) {
+  $object = menu_get_object('islandora_object', 2);
+
+  $form['#tree'] = TRUE;
+
+
+  $form['pid'] = array(
+    '#type' => 'value',
+    '#value' => $object ? $object->id : 'unknown',
+  );
+  if ($object) {
+    $form['info'] = array(
+      '#type' => 'item',
+      '#title' => t('Testing @label (@pid)', array(
+        '@label' => $object->label,
+        '@pid' => $object->id,
+      )),
+    );
+  }
+  else {
+    $form['info'] = array(
+      '#type' => 'item',
+      '#title' => t('Testing something unloadable...', array(
+      )),
+    );
+  }
+
+  $form['perms'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Applied permissions'),
+    '#options' => array(),
+    '#default_value' => array(), 
+  );
+
+  foreach (islandora_access_test_modules() as $module) {
+    foreach ((array) module_invoke($module, 'permission') as $permission => $info) {
+      $form['perms']['#options'][$permission] = $info['title'];
+      $form['perms']['#default_value'][$permission] = (isset($_SESSION['islandora_access_test_perms'][$permission]) ?
+        $_SESSION['islandora_access_test_perms'][$permission] :
+        $permission
+     );
+    }
+  }
+
+  $form['datastream_view'] = array(
+    '#type' => 'checkboxes',
+    '#title' => 'Viewable datastreams',
+    '#options' => array(),
+    '#default_value' => ((is_object($object) && isset($_SESSION['islandora_access_test_datastream_view']) && isset($_SESSION['islandora_access_test_datastream_pid']) && ($_SESSION['islandora_access_test_datastream_pid'] == $object->id)) ?
+      array_keys(array_filter($_SESSION['islandora_access_test_datastream_view'])) :
+      array()),
+  );
+
+  if ($object) {
+    foreach ($object as $dsid => $datastream) {
+      $form['datastream_view']['#options'][$dsid] = $dsid;
+      if (!(isset($_SESSION['islandora_access_test_datastream_view']) && isset($_SESSION['islandora_access_test_datastream_pid']) && ($_SESSION['islandora_access_test_datastream_pid'] == $object->id))) {
+        $form['datastream_view']['#default_value'][] = $dsid;
+      }
+    }
+  }
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  $form['actions']['reset'] = array(
+    '#type' => 'submit',
+    '#value' => t('Reset'),
+  );
+
+  return $form;
+}
+
+function islandora_access_test_form_submit(&$form, &$form_state) {
+  // Save selected permissions into $_SESSION...
+  if (end($form_state['triggering_element']['#parents']) == 'submit') {
+    $_SESSION['islandora_access_test_perms'] = $form_state['values']['perms'];
+    $_SESSION['islandora_access_test_datastream_pid'] = $form_state['values']['pid'];
+    $_SESSION['islandora_access_test_datastream_view'] = $form_state['values']['datastream_view'];
+  }
+  else {
+    foreach (array('perms', 'datastream_view') as $name) {
+      $name = "islandora_access_test_$name";
+      if (isset($_SESSION[$name])) {
+        unset($_SESSION[$name]);
+      }
+    }
+  }
+  drupal_static_reset('islandora_object_access');
+  drupal_static_reset('islandora_datastream_access');
+}

@@ -1,0 +1,6 @@
+name = Islandora Access Test
+description = "A block to forcably limit permissions, for testing."
+package = Islandora
+version = 7.x-dev
+core = 7.x
+dependencies[] = islandora
