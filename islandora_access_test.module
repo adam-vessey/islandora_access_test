@@ -1,5 +1,16 @@
 <?php
+/**
+ * @file
+ * Misc hook and function implementations.
+ */
 
+/**
+ * Get the modules to gather permissions from.
+ *
+ * @return array
+ *   An array of module names, from which we'll grab the permissions from, in
+ *   order to populate our list of checkboxes.
+ */
 function islandora_access_test_modules() {
   return array(
     'islandora',
@@ -7,6 +18,12 @@ function islandora_access_test_modules() {
   );
 }
 
+/**
+ * Implements hook_islandora_object_access().
+ *
+ * (Dis)allows operations based on what we have store in the session, from
+ * having submitted our block.
+ */
 function islandora_access_test_islandora_object_access($op) {
   // Use permission restrictions from $_SESSION to deny thingsu.
   foreach (islandora_access_test_modules() as $module) {
@@ -20,6 +37,12 @@ function islandora_access_test_islandora_object_access($op) {
   return NULL;
 }
 
+/**
+ * Implements hook_islandora_datastream_access().
+ *
+ * (Dis)allows viewing of datastreams, based on what has been stored in the
+ * session from a form submission.
+ */
 function islandora_access_test_islandora_datastream_access($op, $datastream) {
   if (FEDORA_VIEW_OBJECTS == $op && isset($_SESSION['islandora_access_test_datastream_pid']) && $_SESSION['islandora_access_test_datastream_pid'] == $datastream->parent->id) {
     if (isset($_SESSION['islandora_access_test_datastream_view'])) {
@@ -30,7 +53,10 @@ function islandora_access_test_islandora_datastream_access($op, $datastream) {
   return NULL;
 }
 
-function islandora_access_test_block_info(){
+/**
+ * Implements hook_block_info().
+ */
+function islandora_access_test_block_info() {
   $delta = array(
     'islandora_access_test' => array(
       'info' => t('Islandora Access Test Block'),
@@ -44,6 +70,9 @@ function islandora_access_test_block_info(){
   return $delta;
 }
 
+/**
+ * Implements hook_block_view().
+ */
 function islandora_access_test_block_view($delta = '') {
   if ($delta == 'islandora_access_test') {
     return array(
@@ -53,11 +82,13 @@ function islandora_access_test_block_view($delta = '') {
   }
 }
 
+/**
+ * Form building function for our block.
+ */
 function islandora_access_test_form($form, &$form_state) {
   $object = menu_get_object('islandora_object', 2);
 
   $form['#tree'] = TRUE;
-
 
   $form['pid'] = array(
     '#type' => 'value',
@@ -75,8 +106,7 @@ function islandora_access_test_form($form, &$form_state) {
   else {
     $form['info'] = array(
       '#type' => 'item',
-      '#title' => t('Testing something unloadable...', array(
-      )),
+      '#title' => t('Testing something unloadable...'),
     );
   }
 
@@ -84,7 +114,7 @@ function islandora_access_test_form($form, &$form_state) {
     '#type' => 'checkboxes',
     '#title' => t('Applied permissions'),
     '#options' => array(),
-    '#default_value' => array(), 
+    '#default_value' => array(),
   );
 
   foreach (islandora_access_test_modules() as $module) {
@@ -93,7 +123,7 @@ function islandora_access_test_form($form, &$form_state) {
       $form['perms']['#default_value'][$permission] = (isset($_SESSION['islandora_access_test_perms'][$permission]) ?
         $_SESSION['islandora_access_test_perms'][$permission] :
         $permission
-     );
+      );
     }
   }
 
@@ -128,6 +158,11 @@ function islandora_access_test_form($form, &$form_state) {
   return $form;
 }
 
+/**
+ * Submission callback for our block.
+ *
+ * Saves values into the session.
+ */
 function islandora_access_test_form_submit(&$form, &$form_state) {
   // Save selected permissions into $_SESSION...
   if (end($form_state['triggering_element']['#parents']) == 'submit') {
